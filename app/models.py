@@ -77,6 +77,12 @@ class UnsupportedAttachmentError(ValueError):
     architecture/DATA_FLOW.md)."""
 
 
+class NoUsableSourceTextError(ValueError):
+    """Raised when parsing succeeds but leaves nothing to extract from: an
+    empty body and no attachments. Sibling of UnsupportedAttachmentError —
+    architecture/LLM_DESIGN.md's failure table maps both to the same 422."""
+
+
 @dataclass
 class EmailAttachment:
     """A decoded MIME attachment. Binary content only — interpreting it
