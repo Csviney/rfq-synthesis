@@ -1,0 +1,25 @@
+From: John Smith <john.smith@acme-electronics.com>
+To: sales@yourcompany.com
+Subject: RFQ - Electronic Components Quote Request
+Date: Mon, 08 Jun 2026 09:14:00 +0000
+Message-ID: <sample-0@rama-takehome.local>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: 8bit
+
+Hi,
+
+We need pricing and availability for the following parts:
+
+- TI LM358N - Qty 500
+- ATMEGA328P-PU - Qty 250
+- BC547 transistor - Qty 1000
+- 10K 0805 resistor - Qty 5000
+- 100nF 0603 capacitor - Qty 3000
+
+Please provide lead times and unit pricing.
+
+Thanks,
+John Smith
+Acme Electronics
+john.smith@acme-electronics.com

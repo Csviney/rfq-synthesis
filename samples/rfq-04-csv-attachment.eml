@@ -1,0 +1,33 @@
+From: David Chen <david.chen@powertechsolutions.com>
+To: sales@yourcompany.com
+Subject: RFQ - parts list attached (CSV)
+Date: Thu, 11 Jun 2026 08:30:00 -0500
+Message-ID: <sample-3@rama-takehome.local>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="=_rama_takehome_boundary_="
+
+This is a message in MIME format.
+--=_rama_takehome_boundary_=
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: 8bit
+
+Hi,
+
+Our parts list for this RFQ is in the attached CSV. Please quote unit
+pricing and lead times.
+
+Thanks,
+David Chen
+PowerTech Solutions
+david.chen@powertechsolutions.com
+
+--=_rama_takehome_boundary_=
+Content-Type: text/csv; name="parts.csv"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="parts.csv"
+
+UGFydCBOdW1iZXIsTWFudWZhY3R1cmVyLFF1YW50aXR5LFRhcmdldCBQcmljZSxOb3RlcwpMTTc4
+MDUsVGV4YXMgSW5zdHJ1bWVudHMsNTAwLCxUTy0yMjAgcGFja2FnZQpLQlBDNTAxMCwsNTAwLCxC
+cmlkZ2UgcmVjdGlmaWVyCjFONTgxOSwsMjAwMCwsU2Nob3R0a3kgZGlvZGUKTE0zMTdULCwzMDAs
+MS4xMCxBZGp1c3RhYmxlIHJlZ3VsYXRvcgo=
+--=_rama_takehome_boundary_=--

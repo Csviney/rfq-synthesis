@@ -1,0 +1,30 @@
+mpn,manufacturer,description
+LM358N,Texas Instruments,Dual op-amp DIP-8
+LM358D,Texas Instruments,Dual op-amp SOIC-8
+LM358AN,Texas Instruments,Dual op-amp low-offset
+ATMEGA328P-PU,Microchip Technology,8-bit AVR MCU DIP-28
+ATMEGA328P-AU,Microchip Technology,8-bit AVR MCU TQFP-32
+BC547,ON Semiconductor,NPN transistor TO-92
+2N2222A,ON Semiconductor,NPN transistor TO-18
+SN74HC595N,Texas Instruments,8-bit shift register
+NE555P,Texas Instruments,Precision timer DIP-8
+NE555DR,Texas Instruments,Precision timer SOIC-8
+1N4148,Vishay,Small-signal switching diode
+1N5819,ON Semiconductor,Schottky barrier diode
+IRFZ44N,Infineon Technologies,N-channel MOSFET TO-220
+LM7805,Texas Instruments,5V linear regulator TO-220
+LM317T,Texas Instruments,Adjustable linear regulator
+KBPC5010,Diodes Incorporated,50A bridge rectifier
+STM32F407VGT6,STMicroelectronics,ARM Cortex-M4 MCU LQFP-100
+STM32F103C8T6,STMicroelectronics,ARM Cortex-M3 MCU LQFP-48
+AMS1117-3.3,Advanced Monolithic Systems,3.3V LDO regulator
+ILI9486,Ilitek,TFT LCD driver IC
+NEO-6M,u-blox,GPS receiver module
+TL072CP,Texas Instruments,Dual JFET-input op-amp
+MAX232CPE,Maxim Integrated,RS-232 line driver/receiver
+LM2596S-5.0,Texas Instruments,3A step-down regulator
+FT232RL,FTDI,USB-to-UART bridge SSOP
+FT232RQ,FTDI,USB-to-UART bridge QFN
+W25Q128JVSIQ,Winbond,128Mbit SPI NOR flash
+RC0805FR-0710KL,Yageo,0805 10K 1% resistor
+GRM188R71H104KA93D,Murata,0603 100nF X7R capacitor

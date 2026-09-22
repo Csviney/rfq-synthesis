@@ -1,0 +1,33 @@
+From: Mark Johnson <mjohnson@techmanufacturing.com>
+To: sales@yourcompany.com
+Subject: Q3 2026 Production Requirements - multi-board
+Date: Fri, 12 Jun 2026 13:05:00 -0400
+Message-ID: <sample-5@rama-takehome.local>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: 8bit
+
+Good morning,
+
+We are preparing Q3 production and need quotes across two product lines.
+
+PROJECT A - Smart Thermostat (500 units):
+- ESP32-WROOM-32D - 500 pcs
+- Relay 5V 10A SPDT - 2 per board
+- USB-C connector - 500 pcs
+
+PROJECT B - Security Panel (300 units):
+- STM32F407VGT6 - 300 pcs
+- PIR sensor - 3 per unit
+- LED RGB 5mm - 6 per unit
+
+Common to both projects:
+- Resistors 0805 assorted (10K, 4.7K, 1K) - 50,000 total
+- TI LM358N or equivalent dual op-amp - 300 pcs
+
+All parts must be RoHS compliant.
+Delivery split: Project A by Aug 15, Project B by Sep 1.
+
+Mark Johnson
+TechManufacturing Solutions Inc.
+mjohnson@techmanufacturing.com

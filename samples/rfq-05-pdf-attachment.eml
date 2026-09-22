@@ -1,0 +1,60 @@
+From: Sarah Lin <s.lin@northwindcontrols.com>
+To: sales@yourcompany.com
+Subject: Request for Quotation (PDF attached)
+Date: Thu, 11 Jun 2026 16:20:00 +0000
+Message-ID: <sample-4@rama-takehome.local>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="=_rama_takehome_boundary_="
+
+This is a message in MIME format.
+--=_rama_takehome_boundary_=
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: 8bit
+
+Good morning,
+
+Please find our request for quotation attached as a PDF. We would
+appreciate pricing and lead times.
+
+One addition that did not make it into the attachment: please also add
+100 units of the GPS module NEO-6M to the quote.
+
+Regards,
+Sarah Lin
+Northwind Controls
+s.lin@northwindcontrols.com
+
+--=_rama_takehome_boundary_=
+Content-Type: application/pdf; name="rfq.pdf"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="rfq.pdf"
+
+JVBERi0xLjMKJf////8KNyAwIG9iago8PAovVHlwZSAvUGFnZQovUGFyZW50IDEgMCBSCi9NZWRp
+YUJveCBbMCAwIDYxMiA3OTJdCi9Db250ZW50cyA1IDAgUgovUmVzb3VyY2VzIDYgMCBSCj4+CmVu
+ZG9iago2IDAgb2JqCjw8Ci9Qcm9jU2V0IFsvUERGIC9UZXh0IC9JbWFnZUIgL0ltYWdlQyAvSW1h
+Z2VJXQovRm9udCA8PAovRjEgOCAwIFIKPj4KL0NvbG9yU3BhY2UgPDwKPj4KPj4KZW5kb2JqCjUg
+MCBvYmoKPDwKL0xlbmd0aCAzODYKL0ZpbHRlciAvRmxhdGVEZWNvZGUKPj4Kc3RyZWFtCnictZS9
+asQwDMf3PIVf4FLrO4aQodAO3QrZSoeS5LYOff+lku+L466luXKYJMayJf3k/AUp+9iAv6xgmj6b
+rwYu1h7H/SIk0WQoLVIaP5uHZ0ggadw2b72gioGJv8kYs+qQKKdet4aYJSxbYwV/im51wYwzZl7C
+PqQN+1Y3dWZuXtQdMMU2Y0P/TkZDyu9pfGmexub1D1lqoZYRj2nCtTRVIpJONab4rNS12Yg+1sYz
+bom7i3h5SMHm4CfMcC4+87qQMM9EhKzElMkz2x1gE6+AV6kOnhV0GRLEeTnWFtQhTCygwn0snjs/
+OPALYCsnG6EHy2sZFVqly5r+zsiFJy5UnK/7J1H8Mj/wAMl6Hu7aArqWB3gW8oAxDP32cPHnTlxy
+yz2RtmtvSUTI9TIz1WIqzpZDFi6KKsQQSDDs9HwfVrqFFXJrekV3rmpxVgpd26H9xFwcpUSLslzT
+8w7WO2ndGDz7luCHY1b71VxtZx2t2km7U/sYohf2uJwBfAPY5hxcCmVuZHN0cmVhbQplbmRvYmoK
+MTAgMCBvYmoKKFBERktpdCkKZW5kb2JqCjExIDAgb2JqCihQREZLaXQpCmVuZG9iagoxMiAwIG9i
+agooRDoyMDI2MDYyNzEzNTcxMFopCmVuZG9iago5IDAgb2JqCjw8Ci9Qcm9kdWNlciAxMCAwIFIK
+L0NyZWF0b3IgMTEgMCBSCi9DcmVhdGlvbkRhdGUgMTIgMCBSCj4+CmVuZG9iago4IDAgb2JqCjw8
+Ci9UeXBlIC9Gb250Ci9CYXNlRm9udCAvSGVsdmV0aWNhCi9TdWJ0eXBlIC9UeXBlMQovRW5jb2Rp
+bmcgL1dpbkFuc2lFbmNvZGluZwo+PgplbmRvYmoKNCAwIG9iago8PAo+PgplbmRvYmoKMyAwIG9i
+ago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMSAwIFIKL05hbWVzIDIgMCBSCj4+CmVuZG9iagox
+IDAgb2JqCjw8Ci9UeXBlIC9QYWdlcwovQ291bnQgMQovS2lkcyBbNyAwIFJdCj4+CmVuZG9iagoy
+IDAgb2JqCjw8Ci9EZXN0cyA8PAogIC9OYW1lcyBbCl0KPj4KPj4KZW5kb2JqCnhyZWYKMCAxMwow
+MDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDEwMjUgMDAwMDAgbiAKMDAwMDAwMTA4MiAwMDAwMCBu
+IAowMDAwMDAwOTYzIDAwMDAwIG4gCjAwMDAwMDA5NDIgMDAwMDAgbiAKMDAwMDAwMDIyNiAwMDAw
+MCBuIAowMDAwMDAwMTE5IDAwMDAwIG4gCjAwMDAwMDAwMTUgMDAwMDAgbiAKMDAwMDAwMDg0NSAw
+MDAwMCBuIAowMDAwMDAwNzcwIDAwMDAwIG4gCjAwMDAwMDA2ODQgMDAwMDAgbiAKMDAwMDAwMDcw
+OSAwMDAwMCBuIAowMDAwMDAwNzM0IDAwMDAwIG4gCnRyYWlsZXIKPDwKL1NpemUgMTMKL1Jvb3Qg
+MyAwIFIKL0luZm8gOSAwIFIKL0lEIFs8Y2E0NmQ0NTA2MTY2Y2UxMDljMTZjNzAzZmVkMTYyNjk+
+IDxjYTQ2ZDQ1MDYxNjZjZTEwOWMxNmM3MDNmZWQxNjI2OT5dCj4+CnN0YXJ0eHJlZgoxMTI5CiUl
+RU9GCg==
+--=_rama_takehome_boundary_=--

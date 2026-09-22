@@ -1,0 +1,231 @@
+{
+  "rfq-01-bullet.eml": {
+    "isRfq": true,
+    "confidence": 0.9,
+    "customer": {
+      "name": "John Smith",
+      "email": "john.smith@acme-electronics.com",
+      "phone": null,
+      "company": "Acme Electronics"
+    },
+    "request": {
+      "dueDate": null,
+      "priority": "medium",
+      "specialInstructions": "Please provide lead times and unit pricing"
+    },
+    "lineItems": [
+      {
+        "partNumber": "LM358N",
+        "manufacturer": "TI",
+        "description": null,
+        "quantity": 500,
+        "targetPrice": null,
+        "notes": null
+      },
+      {
+        "partNumber": "ATMEGA328P-PU",
+        "manufacturer": null,
+        "description": null,
+        "quantity": 250,
+        "targetPrice": null,
+        "notes": null
+      },
+      {
+        "partNumber": "BC547",
+        "manufacturer": null,
+        "description": null,
+        "quantity": 1000,
+        "targetPrice": null,
+        "notes": null
+      },
+      {
+        "partNumber": "10K 0805",
+        "manufacturer": null,
+        "description": null,
+        "quantity": 5000,
+        "targetPrice": null,
+        "notes": null
+      },
+      {
+        "partNumber": "100nF 0603",
+        "manufacturer": null,
+        "description": null,
+        "quantity": 3000,
+        "targetPrice": null,
+        "notes": null
+      }
+    ],
+    "warnings": []
+  },
+  "rfq-02-table.eml": {
+    "isRfq": true,
+    "confidence": 0.95,
+    "customer": {
+      "name": "Sarah Johnson",
+      "email": "sarah.j@techsolutions.com",
+      "phone": "(555) 123-4567",
+      "company": "Tech Solutions Inc."
+    },
+    "request": {
+      "dueDate": "2026-03-15",
+      "priority": "high",
+      "specialInstructions": "Rush delivery required"
+    },
+    "lineItems": [
+      {
+        "partNumber": "SN74HC595N",
+        "manufacturer": "Texas Instruments",
+        "description": null,
+        "quantity": 200,
+        "targetPrice": 0.5,
+        "notes": null
+      },
+      {
+        "partNumber": "NE555P",
+        "manufacturer": "TI",
+        "description": null,
+        "quantity": 150,
+        "targetPrice": 0.3,
+        "notes": null
+      },
+      {
+        "partNumber": "2N2222A",
+        "manufacturer": "ON Semi",
+        "description": null,
+        "quantity": 1000,
+        "targetPrice": 0.15,
+        "notes": null
+      },
+      {
+        "partNumber": "1N4148",
+        "manufacturer": "Vishay",
+        "description": null,
+        "quantity": 2000,
+        "targetPrice": 0.05,
+        "notes": null
+      },
+      {
+        "partNumber": "IRFZ44N",
+        "manufacturer": "International Rectifier",
+        "description": null,
+        "quantity": 100,
+        "targetPrice": 1.2,
+        "notes": null
+      }
+    ],
+    "warnings": []
+  },
+  "rfq-04-csv-attachment.eml": {
+    "isRfq": true,
+    "confidence": 0.9,
+    "customer": {
+      "name": "David Chen",
+      "email": "david.chen@powertechsolutions.com",
+      "phone": null,
+      "company": "PowerTech Solutions"
+    },
+    "request": {
+      "dueDate": null,
+      "priority": "medium",
+      "specialInstructions": null
+    },
+    "lineItems": [
+      {
+        "partNumber": "LM7805",
+        "manufacturer": "Texas Instruments",
+        "description": null,
+        "quantity": 500,
+        "targetPrice": null,
+        "notes": "TO-220 package"
+      },
+      {
+        "partNumber": "KBPC5010",
+        "manufacturer": null,
+        "description": null,
+        "quantity": 500,
+        "targetPrice": null,
+        "notes": "Bridge rectifier"
+      },
+      {
+        "partNumber": "1N5819",
+        "manufacturer": null,
+        "description": null,
+        "quantity": 2000,
+        "targetPrice": null,
+        "notes": "Schottky diode"
+      },
+      {
+        "partNumber": "LM317T",
+        "manufacturer": null,
+        "description": null,
+        "quantity": 300,
+        "targetPrice": 1.1,
+        "notes": "Adjustable regulator"
+      }
+    ],
+    "warnings": []
+  },
+  "rfq-05-pdf-attachment.eml": {
+    "isRfq": true,
+    "confidence": 0.9,
+    "customer": {
+      "name": "Sarah Lin",
+      "email": "s.lin@northwindcontrols.com",
+      "phone": null,
+      "company": "Northwind Controls"
+    },
+    "request": {
+      "dueDate": null,
+      "priority": "medium",
+      "specialInstructions": null
+    },
+    "lineItems": [
+      {
+        "partNumber": "STM32F407VGT6",
+        "manufacturer": "ST",
+        "description": null,
+        "quantity": 200,
+        "targetPrice": null,
+        "notes": null
+      },
+      {
+        "partNumber": "ILI9486",
+        "manufacturer": null,
+        "description": null,
+        "quantity": 150,
+        "targetPrice": null,
+        "notes": null
+      },
+      {
+        "partNumber": "AMS1117-3.3",
+        "manufacturer": null,
+        "description": null,
+        "quantity": 500,
+        "targetPrice": null,
+        "notes": null
+      },
+      {
+        "partNumber": "USB-C 16-pin connector",
+        "manufacturer": null,
+        "description": null,
+        "quantity": 300,
+        "targetPrice": null,
+        "notes": null
+      },
+      {
+        "partNumber": "NEO-6M",
+        "manufacturer": null,
+        "description": null,
+        "quantity": 100,
+        "targetPrice": null,
+        "notes": "GPS module; added in the email body, not in the PDF"
+      }
+    ],
+    "warnings": []
+  },
+  "not-an-rfq-01-order-confirmation.eml": {
+    "isRfq": false,
+    "confidence": 0.95,
+    "reason": "Order confirmation for a completed purchase, not a request for quotation"
+  }
+}

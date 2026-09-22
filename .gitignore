@@ -1,0 +1,25 @@
+# Local credentials and environment overrides; keep the blank setup template.
+.env
+.env.*
+!.env.example
+
+# Python environments and bytecode.
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Test caches and coverage output.
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Generated Python packaging files.
+*.egg-info/
+build/
+dist/
+
+# macOS metadata.
+.DS_Store

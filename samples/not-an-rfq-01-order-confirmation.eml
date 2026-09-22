@@ -1,0 +1,27 @@
+From: orders@partsdistributor.com
+To: buyer@acme-electronics.com
+Subject: Order Confirmation #20431
+Date: Wed, 03 Jun 2026 10:00:00 +0000
+Message-ID: <sample-8@rama-takehome.local>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: 8bit
+
+Dear Customer,
+
+Thank you for your order. This confirms your purchase:
+
+Order #20431
+Date: June 3, 2026
+
+Items:
+- LM358N (500 pcs) @ $0.45 = $225.00
+- ATmega328P (250 pcs) @ $2.10 = $525.00
+
+Subtotal: $750.00
+Shipping: $25.00
+Total: $775.00
+
+Estimated delivery: June 10, 2026
+
+Please do not reply to this automated message.
