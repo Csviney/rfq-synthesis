@@ -1,15 +1,17 @@
 """App setup, HTTP routes, and error responses. See
 architecture/ARCHITECTURE.md ("HTTP and dashboard") and
 architecture/LLM_DESIGN.md ("Failures") for the exact status-code mapping.
-GET / (the dashboard) is a later step.
 """
 
 import functools
 from contextlib import asynccontextmanager
 from email import policy
 from email.parser import BytesHeaderParser
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
 from app.email_parser import EmailParseError
@@ -60,6 +62,21 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
+# Jinja renders None as the literal text "None"; this filter is the one
+# place "missing" is turned into a display placeholder, kept distinct from
+# a real falsy value like quantity 0 or an empty string (which this filter
+# leaves untouched — only `None` triggers it).
+templates.env.filters["display"] = lambda value: "—" if value is None else value
+
+
+@app.get("/", response_class=HTMLResponse)
+async def dashboard(request: Request):
+    # Newest first, so an operator glancing at the page sees this
+    # morning's RFQs at the top without scrolling.
+    rfqs = list(reversed(request.app.state.store.list()))
+    return templates.TemplateResponse(request, "index.html", {"rfqs": rfqs})
 
 
 def _get_subject(raw: bytes) -> str | None:

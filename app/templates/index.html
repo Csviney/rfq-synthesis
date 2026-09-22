@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>RFQ Dashboard</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 900px; padding: 0 1rem; color: #1a1a1a; }
+  h1 { font-size: 1.4rem; }
+  .subtitle { color: #555; margin-top: -0.5rem; }
+  .empty-state { border: 1px dashed #bbb; border-radius: 8px; padding: 2rem; text-align: center; color: #555; margin-top: 2rem; }
+  .rfq { border: 1px solid #ddd; border-radius: 8px; margin-bottom: 1rem; padding: 0; }
+  .rfq summary { cursor: pointer; padding: 0.85rem 1rem; list-style: none; }
+  .rfq summary::-webkit-details-marker { display: none; }
+  .rfq summary .subject { font-weight: 600; }
+  .rfq summary .meta { color: #555; font-size: 0.9rem; margin-top: 0.15rem; }
+  .rfq-body { padding: 0 1rem 1rem 1rem; border-top: 1px solid #eee; }
+  .section { margin-top: 1rem; }
+  .section h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; color: #666; margin-bottom: 0.4rem; }
+  dl.fields { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; margin: 0; }
+  dl.fields dt { color: #666; }
+  dl.fields dd { margin: 0; }
+  table.line-items { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+  table.line-items th, table.line-items td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid #eee; }
+  table.line-items th { color: #666; font-weight: 600; }
+  ul.warnings { margin: 0; padding-left: 1.2rem; color: #8a5300; }
+  .no-warnings { color: #555; }
+  .confidence { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; background: #eef2ff; color: #2f3fa8; font-size: 0.85rem; }
+  .priority-high, .priority-urgent { color: #a83232; font-weight: 600; }
+</style>
+</head>
+<body>
+  <h1>RFQ Dashboard</h1>
+  <p class="subtitle">{{ rfqs | length }} RFQ{{ "" if rfqs | length == 1 else "s" }} ingested this session</p>
+
+  {% if not rfqs %}
+    <div class="empty-state">No RFQs ingested yet. POST an email to /ingest, then refresh this page.</div>
+  {% endif %}
+
+  {% for rfq in rfqs %}
+    {% set result = rfq.result %}
+    <details class="rfq">
+      <summary>
+        <div class="subject">{{ rfq.subject | display }}</div>
+        <div class="meta">
+          {{ result.customer.company | display }} &middot;
+          {{ result.customer.name | display }} &middot;
+          {{ rfq.ingested_at.strftime("%Y-%m-%d %H:%M UTC") }} &middot;
+          {{ result.lineItems | length }} item{{ "" if result.lineItems | length == 1 else "s" }} &middot;
+          <span class="confidence">{{ (result.confidence * 100) | round | int }}% confidence</span>
+        </div>
+      </summary>
+      <div class="rfq-body">
+        <div class="section">
+          <h3>Customer</h3>
+          <dl class="fields">
+            <dt>Name</dt><dd>{{ result.customer.name | display }}</dd>
+            <dt>Company</dt><dd>{{ result.customer.company | display }}</dd>
+            <dt>Email</dt><dd>{{ result.customer.email | display }}</dd>
+            <dt>Phone</dt><dd>{{ result.customer.phone | display }}</dd>
+          </dl>
+        </div>
+
+        <div class="section">
+          <h3>Request</h3>
+          <dl class="fields">
+            <dt>Due date</dt><dd>{{ result.request.dueDate | display }}</dd>
+            <dt>Priority</dt>
+            <dd class="priority-{{ result.request.priority }}">{{ result.request.priority }}</dd>
+            <dt>Special instructions</dt><dd>{{ result.request.specialInstructions | display }}</dd>
+          </dl>
+        </div>
+
+        <div class="section">
+          <h3>Line items</h3>
+          <table class="line-items">
+            <thead>
+              <tr>
+                <th>Part number</th>
+                <th>Manufacturer</th>
+                <th>Description</th>
+                <th>Quantity</th>
+                <th>Target price</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in result.lineItems %}
+                <tr>
+                  <td>{{ item.partNumber }}</td>
+                  <td>{{ item.manufacturer | display }}</td>
+                  <td>{{ item.description | display }}</td>
+                  <td>{{ item.quantity }}</td>
+                  <td>{{ item.targetPrice | display }}</td>
+                  <td>{{ item.notes | display }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="section">
+          <h3>Warnings</h3>
+          {% if result.warnings %}
+            <ul class="warnings">
+              {% for warning in result.warnings %}
+                <li>{{ warning }}</li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="no-warnings">No warnings.</p>
+          {% endif %}
+        </div>
+      </div>
+    </details>
+  {% endfor %}
+</body>
+</html>

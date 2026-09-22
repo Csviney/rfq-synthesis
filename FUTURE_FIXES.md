@@ -26,6 +26,39 @@ requests and repeat-run variability. Choose the least costly model that
 meets the agreed quality threshold rather than optimizing token price alone;
 small differences in error rate and cost compound at production volume.
 
+Another example, quantified during the step 6 acceptance pass:
+`rfq-06-multi-project.eml` states two separate per-project delivery dates
+rather than one due date. `DATA_FLOW.md` requires this to be flagged with a
+warning; `app/rfq_service.py::_finalize_rfq` adds nothing for this case
+itself (unlike the due-date-before-email-date and empty-lineItems warnings,
+which are deterministic), so it depends entirely on the model choosing to
+self-report it. Across 5 real runs of this sample (same prompt, same
+input), the warning appeared in 4 and was missing in 1 — the extraction
+itself (items, quantities, dates, RoHS, equivalents) was correct every
+time. A ~20% miss rate on a documented requirement is a real gap to weigh
+against a candidate model, not just a quirk to note.
+
+## Manual review for low-confidence results and a correction audit trail
+
+Before automatically accepting RFQs downstream, route low-confidence results
+to an operator for inspection against the source email and attachments.
+Confidence below 70% is an illustrative starting threshold, not an approved
+cutoff: derive and validate the threshold from labeled evaluations and logged
+review outcomes, balancing missed errors against review workload. The current
+model score is self-reported and uncalibrated, not a measured probability of
+correctness.
+
+Record the original classification, extracted fields, confidence, model/prompt
+version, and source reference alongside each review decision. Preserve who
+reviewed it, when, the corrected classification or fields, and the reason,
+rather than overwriting the original result. Use this audit trail to measure
+incorrectly labeled RFQs and extraction errors, improve evaluations, and
+revisit the routing threshold. Include a way to recover false negatives:
+reviewing only accepted RFQs cannot discover actual RFQs mislabeled as non-RFQs.
+
+This is a future workflow; the MVP retains its current storage, public response
+contract, and confidence-independent routing.
+
 ## Warning dedup is exact-string-match only
 
 `app/rfq_service.py::_finalize_rfq` merges model-produced warnings with

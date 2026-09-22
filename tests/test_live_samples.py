@@ -6,16 +6,23 @@ OPENAI_API_KEY/OPENAI_MODEL are set — credentials alone are not consent to
 spend money on every `pytest tests/` run, e.g. in a dev environment where a
 .env with real keys is already loaded.
 
-Step 1 added the schema smoke test (proves ModelEnvelope/RfqResult/
-NonRfqResult are accepted by the provider's structured-output support).
-Step 3 adds the two checks its own completion check calls for: a body RFQ
-and a non-RFQ working end to end through the real model. The full sample
-matrix (ambiguity, both negatives, the restock injection, body/PDF
-completeness) is step 6's acceptance pass, not this one's.
+Step 1 added the schema smoke test. Step 3 added the two checks its own
+completion check calls for: a body RFQ and a non-RFQ working end to end.
+Step 6 (here) fills in the rest of architecture/DATA_FLOW.md's "Sample
+acceptance checks" table: ambiguity, per-board/pooled quantity math, split
+project deadlines, the restock prompt-injection sample, the second
+negative, and body/PDF completeness. rfq-08-image.eml (the unsupported
+image attachment) is not a live check — parsing rejects it before any
+model call, already covered offline in tests/test_parsing.py.
+
+Compare stable fields and item sets, not exact confidence or prose, per
+IMPLEMENTATION_PLAN.md — labels.json is reference data, not a runtime
+oracle, and isn't read here.
 """
 
 import functools
 import os
+import re
 from pathlib import Path
 
 import pytest
@@ -75,27 +82,22 @@ def _live_extractor():
     return client, functools.partial(extract, client, config.model)
 
 
-def test_body_rfq_sample_works_with_the_real_model():
-    """architecture/DATA_FLOW.md's sample table: rfq-01-bullet.eml is an
-    RFQ with five items: TI LM358N x500, ATMEGA328P-PU x250, BC547 x1000,
-    a 10K resistor x5000, a 100nF capacitor x3000. Checking identifier ->
-    quantity pairs (not just the two sets independently) catches a model
-    that mismatches which part gets which quantity; substring matching
-    (not exact partNumber equality) tolerates real-model wording
-    differences on the two generic, MPN-less passive parts."""
+def _run(filename):
     client, extractor = _live_extractor()
     try:
-        raw = (SAMPLES_DIR / "rfq-01-bullet.eml").read_bytes()
-        result = process_email(raw, extractor)
+        raw = (SAMPLES_DIR / filename).read_bytes()
+        return process_email(raw, extractor)
     finally:
         client.close()
 
-    assert isinstance(result, RfqResult)
-    assert len(result.lineItems) == 5
 
-    expected = {"LM358N": 500, "ATMEGA328P-PU": 250, "BC547": 1000, "10K": 5000, "100NF": 3000}
+def _assert_identifier_quantity_pairs(line_items, expected):
+    """Substring match on partNumber+description (not exact equality) to
+    tolerate real-model wording differences on generic, MPN-less parts.
+    Checking pairs, not the two sets independently, catches a model that
+    mismatches which part gets which quantity."""
     found = {}
-    for item in result.lineItems:
+    for item in line_items:
         haystack = f"{item.partNumber} {item.description or ''}".upper()
         for key in expected:
             if key in haystack:
@@ -103,15 +105,216 @@ def test_body_rfq_sample_works_with_the_real_model():
     assert found == expected
 
 
+def _find_item(line_items, key):
+    """Like _assert_identifier_quantity_pairs, but returns the matched
+    item itself so a test can also check its manufacturer/price/notes."""
+    matches = [
+        item
+        for item in line_items
+        if key in f"{item.partNumber} {item.description or ''}".upper()
+    ]
+    assert len(matches) == 1, f"expected exactly one line item matching {key!r}, found {matches}"
+    return matches[0]
+
+
+def _mentions_date(text: str, month_name: str, month_num: str, day: int) -> bool:
+    """Whether `text` names this specific date, tolerating the two
+    date renderings a model realistically produces (month-name prose, or
+    an ISO date it copied through) without accepting a different day —
+    e.g. must reject "Sep 30" when checking for "Sep 1"."""
+    not_digit_adjacent = rf"(?<!\d){day}(?!\d)"
+    name_pattern = rf"{month_name}\w*\.?\s*{not_digit_adjacent}"
+    iso_pattern = rf"-{month_num}-{day:02d}(?!\d)"
+    return bool(re.search(name_pattern, text, re.IGNORECASE) or re.search(iso_pattern, text))
+
+
+def test_body_rfq_sample_works_with_the_real_model():
+    """architecture/DATA_FLOW.md's sample table: rfq-01-bullet.eml is an
+    RFQ with five items: TI LM358N x500, ATMEGA328P-PU x250, BC547 x1000,
+    a 10K resistor x5000, a 100nF capacitor x3000."""
+    result = _run("rfq-01-bullet.eml")
+
+    assert isinstance(result, RfqResult)
+    assert len(result.lineItems) == 5
+    _assert_identifier_quantity_pairs(
+        result.lineItems,
+        {"LM358N": 500, "ATMEGA328P-PU": 250, "BC547": 1000, "10K": 5000, "100NF": 3000},
+    )
+
+
 def test_non_rfq_sample_works_with_the_real_model():
     """architecture/DATA_FLOW.md: the order confirmation is a non-RFQ
     despite containing parts, quantities, and prices."""
-    client, extractor = _live_extractor()
-    try:
-        raw = (SAMPLES_DIR / "not-an-rfq-01-order-confirmation.eml").read_bytes()
-        result = process_email(raw, extractor)
-    finally:
-        client.close()
-
+    result = _run("not-an-rfq-01-order-confirmation.eml")
     assert isinstance(result, NonRfqResult)
     assert result.reason.strip()
+
+
+def test_newsletter_sample_is_a_non_rfq():
+    """architecture/DATA_FLOW.md: non-RFQ despite product and pricing
+    language ("Available in quantities from 100 to 10,000 units")."""
+    result = _run("not-an-rfq-02-newsletter.eml")
+    assert isinstance(result, NonRfqResult)
+    assert result.reason.strip()
+
+
+def test_table_sample_preserves_due_date_and_flags_it_against_the_email_date():
+    """architecture/DATA_FLOW.md: five rows with prices/manufacturers,
+    high priority; preserve 2026-03-15 and flag that it precedes the June
+    email date (without changing it). Checks manufacturer/price per row,
+    not just quantity — the source table states a different manufacturer
+    notation per row (e.g. "Texas Instruments" for one part, "TI" for
+    another), so each row's expected substring is drawn from what that
+    specific row actually says."""
+    result = _run("rfq-02-table.eml")
+
+    assert isinstance(result, RfqResult)
+    assert len(result.lineItems) == 5
+    assert result.request.priority == "high"
+    assert result.request.dueDate.isoformat() == "2026-03-15"
+    assert any("before the email date" in w for w in result.warnings)
+
+    # key -> (quantity, a substring of the source-stated manufacturer, target price)
+    expected = {
+        "SN74HC595N": (200, "TEXAS", 0.50),
+        "NE555P": (150, "TI", 0.30),
+        "2N2222A": (1000, "ON", 0.15),
+        "1N4148": (2000, "VISHAY", 0.05),
+        "IRFZ44N": (100, "RECTIFIER", 1.20),
+    }
+    for key, (quantity, manufacturer_substr, price) in expected.items():
+        item = _find_item(result.lineItems, key)
+        assert item.quantity == quantity
+        assert item.manufacturer and manufacturer_substr in item.manufacturer.upper()
+        assert item.targetPrice == pytest.approx(price)
+
+
+def test_ambiguous_sample_uses_the_lower_bound_of_each_range_or_approximation():
+    """architecture/DATA_FLOW.md's sample table: quantities 100, 200, 50,
+    100, 25 under the range/approximation policy (lower bound of a stated
+    range; the approximate number as given). Checked as identifier ->
+    quantity pairs, not a bare multiset — five right numbers attached to
+    the wrong parts would otherwise pass. Also checks that the original
+    range/approximation is retained somewhere (per DATA_FLOW.md), not just
+    that the collapsed number is right: the source states "100-150",
+    "roughly 200", "50 to 75", "~100pcs", "approx. 25-30"."""
+    result = _run("rfq-03-ambiguous.eml")
+
+    assert isinstance(result, RfqResult)
+    assert len(result.lineItems) == 5
+    _assert_identifier_quantity_pairs(
+        result.lineItems,
+        {"ATMEGA328P": 100, "ESP8266": 200, "LM2596": 50, "OLED": 100, "DHT22": 25},
+    )
+
+    warnings_text = " ".join(result.warnings)
+
+    def _range_preserved(key, upper_bound):
+        item = _find_item(result.lineItems, key)
+        text = f"{item.notes or ''} {warnings_text}"
+        return str(upper_bound) in text
+
+    def _approximation_preserved(key):
+        item = _find_item(result.lineItems, key)
+        text = f"{item.notes or ''} {warnings_text}".lower()
+        return any(word in text for word in ("rough", "approx", "~", "about"))
+
+    assert _range_preserved("ATMEGA328P", 150)
+    assert _range_preserved("LM2596", 75)
+    assert _range_preserved("DHT22", 30)
+    assert _approximation_preserved("ESP8266")
+    assert _approximation_preserved("OLED")
+
+
+def test_csv_attachment_sample_works_with_the_real_model():
+    """architecture/DATA_FLOW.md: LM7805 500, KBPC5010 500, 1N5819 2,000,
+    LM317T 300; LM317T target price 1.1."""
+    result = _run("rfq-04-csv-attachment.eml")
+
+    assert isinstance(result, RfqResult)
+    assert len(result.lineItems) == 4
+    _assert_identifier_quantity_pairs(
+        result.lineItems,
+        {"LM7805": 500, "KBPC5010": 500, "1N5819": 2000, "LM317T": 300},
+    )
+    lm317t = next(item for item in result.lineItems if "LM317T" in item.partNumber.upper())
+    assert lm317t.targetPrice == pytest.approx(1.1)
+
+
+def test_pdf_attachment_sample_merges_pdf_and_body_only_item():
+    """architecture/DATA_FLOW.md: four PDF items plus body-only NEO-6M
+    100 — five items total."""
+    result = _run("rfq-05-pdf-attachment.eml")
+
+    assert isinstance(result, RfqResult)
+    assert len(result.lineItems) == 5
+    _assert_identifier_quantity_pairs(
+        result.lineItems,
+        {
+            "STM32F407VGT6": 200,
+            "ILI9486": 150,
+            "AMS1117-3.3": 500,
+            "USB-C": 300,
+            "NEO-6M": 100,
+        },
+    )
+
+
+def test_multi_project_sample_computes_per_board_totals_and_keeps_pooled_quantity():
+    """architecture/DATA_FLOW.md: eight lines. Relay 1,000 (2x500), PIR 900
+    (3x300), LED 1,800 (6x300); keep 50,000 assorted resistors pooled;
+    preserve equivalents, RoHS, project context, and both delivery dates
+    (as a null request-level date, both dates retained, with a warning
+    per the split-deadline policy) — Project A by Aug 15, Project B by
+    Sep 1. Checks the actual day of month, not just that "Aug"/"Sep"
+    appear anywhere: "August 1" and "September 30" would otherwise pass."""
+    result = _run("rfq-06-multi-project.eml")
+
+    assert isinstance(result, RfqResult)
+    assert len(result.lineItems) == 8
+    _assert_identifier_quantity_pairs(
+        result.lineItems,
+        {
+            "ESP32-WROOM-32D": 500,
+            "RELAY": 1000,
+            "USB-C": 500,
+            "STM32F407VGT6": 300,
+            "PIR": 900,
+            "LED": 1800,
+            "RESISTOR": 50000,
+            "LM358N": 300,
+        },
+    )
+    assert result.request.dueDate is None
+
+    lm358n = _find_item(result.lineItems, "LM358N")
+    combined_text = " ".join(
+        [result.request.specialInstructions or ""]
+        + [item.notes or "" for item in result.lineItems]
+        + result.warnings
+    )
+
+    assert _mentions_date(combined_text, "aug", "08", 15)
+    assert _mentions_date(combined_text, "sep", "09", 1)
+    assert "rohs" in combined_text.lower()
+    assert "equivalent" in f"{lm358n.notes or ''} {lm358n.description or ''}".lower()
+    assert "project a" in combined_text.lower() and "project b" in combined_text.lower()
+    # DATA_FLOW.md requires a warning for a split deadline; whether the
+    # model actually adds one is real signal, not test flakiness — see
+    # FUTURE_FIXES.md if this needs to be tracked as a standing
+    # model-reliability limitation rather than fixed outright.
+    assert result.warnings
+
+
+def test_restock_sample_resists_the_embedded_injection():
+    """architecture/DATA_FLOW.md: the embedded fake "SYSTEM INSTRUCTION"
+    telling the model to report isRfq=false must not suppress the actual
+    request — TL072CP 400, STM32F103C8T6 250, AMS1117-3.3 1,000."""
+    result = _run("rfq-07-restock.eml")
+
+    assert isinstance(result, RfqResult)
+    assert len(result.lineItems) == 3
+    _assert_identifier_quantity_pairs(
+        result.lineItems,
+        {"TL072CP": 400, "STM32F103C8T6": 250, "AMS1117-3.3": 1000},
+    )
