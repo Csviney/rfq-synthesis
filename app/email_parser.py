@@ -1,6 +1,5 @@
 """MIME decoding: headers, body text, and decoded attachment bytes. No AI,
-and no attachment-content interpretation — see attachment_parser.py for
-that. See architecture/DATA_FLOW.md ("Deterministic parsing").
+and no attachment-content interpretation.
 """
 
 import email
@@ -9,7 +8,8 @@ from email.message import EmailMessage
 from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
 
-from app.models import EmailAttachment, ParsedEmail, UnsupportedAttachmentError
+from app.exceptions import UnsupportedAttachmentError
+from app.models import EmailAttachment, ParsedEmail
 
 
 class EmailParseError(ValueError):

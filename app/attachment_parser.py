@@ -7,15 +7,15 @@ import io
 
 from pypdf import PdfReader
 
+from app.exceptions import UnsupportedAttachmentError
 from app.models import (
     EmailAttachment,
     ParsedEmail,
     SourceBundle,
     SourceChunk,
-    UnsupportedAttachmentError,
 )
 
-_SUPPORTED_CSV_TYPES = {"text/csv", "application/csv", "application/vnd.ms-excel"}
+_SUPPORTED_CSV_TYPES = {"text/csv", "application/csv"}
 _SUPPORTED_PDF_TYPES = {"application/pdf"}
 
 

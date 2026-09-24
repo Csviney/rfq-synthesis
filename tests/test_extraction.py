@@ -13,13 +13,14 @@ import openai
 import pydantic
 import pytest
 
-from app.llm_client import (
+from app.exceptions import (
+    NoUsableSourceTextError,
     ProviderResponseError,
     ProviderTimeoutError,
     ProviderUnavailableError,
-    extract,
 )
-from app.models import ModelEnvelope, NoUsableSourceTextError, RfqResult, SourceBundle, SourceChunk
+from app.llm_client import extract
+from app.models import ModelEnvelope, RfqResult, SourceBundle, SourceChunk
 from app.rfq_service import process_email
 
 VALID_RFQ = {
@@ -41,6 +42,12 @@ VALID_RFQ = {
 }
 
 VALID_NON_RFQ = {"isRfq": False, "confidence": 0.95, "reason": "Newsletter, not an RFQ."}
+
+VALID_TRIAGE = {
+    "category": "begin_pricing",
+    "reason": "All parts are identified with an explicit quantity.",
+    "nextStep": "Check unit pricing and lead times.",
+}
 
 _FAKE_REQUEST = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
 
@@ -76,18 +83,19 @@ BUNDLE = SourceBundle(
 )
 
 
-def test_extract_returns_result_on_success():
-    envelope = ModelEnvelope.model_validate({"result": VALID_RFQ})
+def test_extract_returns_envelope_with_result_and_triage_on_success():
+    envelope = ModelEnvelope.model_validate({"result": VALID_RFQ, "triage": VALID_TRIAGE})
     client = _FakeClient(lambda **kwargs: _completion_with(parsed=envelope))
 
-    result = extract(client, "gpt-4o-mini", BUNDLE)
+    returned = extract(client, "gpt-4o-mini", BUNDLE)
 
-    assert isinstance(result, RfqResult)
-    assert result.lineItems[0].partNumber == "LM358N"
+    assert isinstance(returned.result, RfqResult)
+    assert returned.result.lineItems[0].partNumber == "LM358N"
+    assert returned.triage.category == "begin_pricing"
 
 
 def test_extract_sends_instructions_and_source_as_separate_messages():
-    envelope = ModelEnvelope.model_validate({"result": VALID_NON_RFQ})
+    envelope = ModelEnvelope.model_validate({"result": VALID_NON_RFQ, "triage": None})
     client = _FakeClient(lambda **kwargs: _completion_with(parsed=envelope))
 
     extract(client, "gpt-4o-mini", BUNDLE)
@@ -161,7 +169,7 @@ def test_extract_raises_provider_response_error_on_locally_invalid_result():
     real ValidationError rather than a stand-in exception."""
     bad_result = {**VALID_RFQ, "lineItems": [{**VALID_RFQ["lineItems"][0], "partNumber": "   "}]}
     try:
-        ModelEnvelope.model_validate({"result": bad_result})
+        ModelEnvelope.model_validate({"result": bad_result, "triage": VALID_TRIAGE})
         pytest.fail("expected ModelEnvelope validation to reject a blank partNumber")
     except pydantic.ValidationError as validation_error:
         real_error = validation_error
@@ -188,14 +196,19 @@ def _raw_email(body: str = "Please quote 500 of LM358N.") -> bytes:
     return msg.encode("utf-8")
 
 
+def _envelope(result, triage):
+    return ModelEnvelope.model_validate({"result": result, "triage": triage})
+
+
 def test_process_email_passes_non_rfq_through_unchanged():
-    non_rfq = ModelEnvelope.model_validate({"result": VALID_NON_RFQ}).result
-    result = process_email(_raw_email(), lambda bundle: non_rfq)
-    assert result is non_rfq
+    non_rfq_envelope = _envelope(VALID_NON_RFQ, None)
+    envelope = process_email(_raw_email(), lambda bundle: non_rfq_envelope)
+    assert envelope.result is non_rfq_envelope.result
+    assert envelope.triage is None
 
 
 def test_process_email_merges_parser_warnings_into_rfq_warnings():
-    rfq = ModelEnvelope.model_validate({"result": VALID_RFQ}).result
+    rfq_envelope = _envelope(VALID_RFQ, VALID_TRIAGE)
     # An HTML-only body forces a parser warning ("Body was HTML-only...").
     html_email = (
         b"From: a@example.com\r\n"
@@ -205,24 +218,23 @@ def test_process_email_merges_parser_warnings_into_rfq_warnings():
         b"\r\n"
         b"<p>Please quote 500 of LM358N.</p>\r\n"
     )
-    result = process_email(html_email, lambda bundle: rfq)
-    assert any("HTML" in w for w in result.warnings)
+    envelope = process_email(html_email, lambda bundle: rfq_envelope)
+    assert any("HTML" in w for w in envelope.result.warnings)
 
 
 def test_process_email_flags_due_date_before_email_date_without_changing_it():
-    rfq_with_early_due_date = RfqResult.model_validate(
-        {**VALID_RFQ, "request": {**VALID_RFQ["request"], "dueDate": "2020-01-01"}}
-    )
-    result = process_email(_raw_email(), lambda bundle: rfq_with_early_due_date)
+    early_due_date = {**VALID_RFQ, "request": {**VALID_RFQ["request"], "dueDate": "2020-01-01"}}
+    envelope_in = _envelope(early_due_date, VALID_TRIAGE)
+    envelope = process_email(_raw_email(), lambda bundle: envelope_in)
 
-    assert result.request.dueDate.isoformat() == "2020-01-01"  # unchanged
-    assert any("before the email date" in w for w in result.warnings)
+    assert envelope.result.request.dueDate.isoformat() == "2020-01-01"  # unchanged
+    assert any("before the email date" in w for w in envelope.result.warnings)
 
 
 def test_process_email_flags_rfq_with_no_line_items():
-    empty_rfq = RfqResult.model_validate({**VALID_RFQ, "lineItems": []})
-    result = process_email(_raw_email(), lambda bundle: empty_rfq)
-    assert any("no identifiable line items" in w for w in result.warnings)
+    envelope_in = _envelope({**VALID_RFQ, "lineItems": []}, VALID_TRIAGE)
+    envelope = process_email(_raw_email(), lambda bundle: envelope_in)
+    assert any("no identifiable line items" in w for w in envelope.result.warnings)
 
 
 def test_process_email_rejects_empty_source_without_calling_extractor():
@@ -235,3 +247,78 @@ def test_process_email_rejects_empty_source_without_calling_extractor():
     with pytest.raises(NoUsableSourceTextError):
         process_email(_raw_email(body=""), extractor)
     assert calls == []
+
+
+# --- rfq_service._reconcile_triage, exercised through process_email -----
+
+
+def test_process_email_preserves_model_triage_when_nothing_overrides_it():
+    envelope_in = _envelope(VALID_RFQ, VALID_TRIAGE)
+    envelope = process_email(_raw_email(), lambda bundle: envelope_in)
+    assert envelope.triage.category == "begin_pricing"
+    assert envelope.triage.reason == VALID_TRIAGE["reason"]
+
+
+def test_process_email_overrides_triage_when_due_date_precedes_email_date():
+    early_due_date = {**VALID_RFQ, "request": {**VALID_RFQ["request"], "dueDate": "2020-01-01"}}
+    envelope_in = _envelope(early_due_date, VALID_TRIAGE)  # model said begin_pricing
+    envelope = process_email(_raw_email(), lambda bundle: envelope_in)
+
+    assert envelope.triage.category == "clarify_with_customer"
+    assert "2020-01-01" in envelope.triage.reason
+
+
+def test_process_email_overrides_triage_when_no_line_items():
+    envelope_in = _envelope({**VALID_RFQ, "lineItems": []}, VALID_TRIAGE)  # model said begin_pricing
+    envelope = process_email(_raw_email(), lambda bundle: envelope_in)
+
+    assert envelope.triage.category == "clarify_with_customer"
+    assert "line items" in envelope.triage.reason.lower()
+
+
+def test_process_email_overrides_triage_when_a_quantity_is_unspecified():
+    zero_quantity_item = {**VALID_RFQ["lineItems"][0], "quantity": 0}
+    envelope_in = _envelope({**VALID_RFQ, "lineItems": [zero_quantity_item]}, VALID_TRIAGE)
+    envelope = process_email(_raw_email(), lambda bundle: envelope_in)
+
+    assert envelope.triage.category == "clarify_with_customer"
+    assert "LM358N" in envelope.triage.reason
+
+
+def test_process_email_keeps_models_own_reason_when_it_already_says_clarify():
+    """A quantity that extracts to 0 can represent a genuine conflict (e.g.
+    "120 or 240, not sure which") that the model already caught with a more
+    specific reason than our generic zero-quantity fallback. Only override
+    when the model's own category was wrong, not when it already agrees."""
+    zero_quantity_item = {**VALID_RFQ["lineItems"][0], "quantity": 0}
+    specific_triage = {
+        "category": "clarify_with_customer",
+        "reason": "Quantity is stated inconsistently as both 120 and 240 units.",
+        "nextStep": "Ask the customer to confirm whether the quantity is 120 or 240.",
+    }
+    envelope_in = _envelope({**VALID_RFQ, "lineItems": [zero_quantity_item]}, specific_triage)
+    envelope = process_email(_raw_email(), lambda bundle: envelope_in)
+
+    assert envelope.triage.category == "clarify_with_customer"
+    assert envelope.triage.reason == specific_triage["reason"]
+    assert envelope.triage.nextStep == specific_triage["nextStep"]
+
+
+def test_process_email_due_date_override_takes_precedence_over_quantity_override():
+    zero_quantity_item = {**VALID_RFQ["lineItems"][0], "quantity": 0}
+    both_problems = {
+        **VALID_RFQ,
+        "lineItems": [zero_quantity_item],
+        "request": {**VALID_RFQ["request"], "dueDate": "2020-01-01"},
+    }
+    envelope_in = _envelope(both_problems, VALID_TRIAGE)
+    envelope = process_email(_raw_email(), lambda bundle: envelope_in)
+
+    assert "2020-01-01" in envelope.triage.reason  # due-date reason wins
+    assert "LM358N" not in envelope.triage.reason
+
+
+def test_process_email_never_reconciles_triage_for_a_non_rfq():
+    non_rfq_envelope = _envelope(VALID_NON_RFQ, None)
+    envelope = process_email(_raw_email(), lambda bundle: non_rfq_envelope)
+    assert envelope.triage is None

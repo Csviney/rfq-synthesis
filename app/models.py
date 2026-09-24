@@ -1,15 +1,5 @@
 """Parsed input, the source bundle handed to the model, and the public
-output contract with its private provider envelope.
-
-Source of truth: architecture/LLM_DESIGN.md ("Public responses" and
-"Provider response") for RfqResult/NonRfqResult/ModelEnvelope, and
-architecture/ARCHITECTURE.md ("Data passed between components") for
-ParsedEmail/SourceBundle. Every contract model forbids extra fields and
-requires every key in its branch, including keys whose value is null, so a
-malformed or partial provider response fails validation instead of being
-silently patched up. ParsedEmail/SourceBundle carry no such contract with
-an outside caller, so they're plain dataclasses.
-"""
+output contract with its private provider envelope."""
 
 import re
 from dataclasses import dataclass, field
@@ -26,13 +16,6 @@ from pydantic import (
 )
 
 Priority = Literal["low", "medium", "high", "urgent"]
-
-# Confidence and targetPrice are floats but a model may emit a whole number
-# (e.g. `1` for full confidence) as a bare JSON integer. Pydantic's strict
-# float already widens int -> float, so the model's strict=True is enough;
-# no per-field strict=False, which would also silently coerce a string or a
-# bool. allow_inf_nan=False rejects NaN/Infinity, which Python's json module
-# accepts as numbers but the contract does not.
 ConfidenceField = Annotated[float, Field(ge=0, le=1, allow_inf_nan=False)]
 PriceField = Annotated[float, Field(ge=0, allow_inf_nan=False)]
 
@@ -40,47 +23,23 @@ _DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def _parse_exact_iso_date(value: object) -> date:
-    """`date`'s lax parsing accepts more than "YYYY-MM-DD": a full
-    datetime string is truncated to its date part, and an int/numeric
-    string is read as a Unix timestamp (e.g. 0 -> "1970-01-01"). Require the
-    exact contract format ourselves, then let date.fromisoformat reject an
-    invalid calendar date (e.g. 2026-02-30)."""
+    """Require model-produced dates to use YYYY-MM-DD and represent a real
+    calendar date. Reject other formats instead of silently converting them."""
     if not isinstance(value, str) or not _DATE_PATTERN.match(value):
         raise ValueError('dueDate must be an exact "YYYY-MM-DD" string')
     return date.fromisoformat(value)
 
 
-# strict=True is unreachable here: the before-validator above already
-# produces a real `date` object (or raises), so the built-in date validator
-# just confirms the type.
+# The before-validator converts a valid YYYY-MM-DD string into a date.
+# Pydantic's strict validation then confirms it received a date object.
 DueDateField = Annotated[date, BeforeValidator(_parse_exact_iso_date)]
 
 
 def _require_actual_bool_is_rfq(data: object) -> object:
-    """Literal[True]/Literal[False] compare with `==`, under which
-    `1 == True` and `0 == False`, so strict mode alone lets an int through.
-    isRfq also doubles as the discriminator field, and pydantic forbids a
-    field_validator(mode="before") there, so this runs as a whole-model
-    validator instead and rejects a non-bool isRfq before field validation."""
+    """Require isRfq to be an actual boolean, rejecting numbers and strings."""
     if isinstance(data, dict) and "isRfq" in data and not isinstance(data["isRfq"], bool):
         raise ValueError("isRfq must be a boolean")
     return data
-
-
-class UnsupportedAttachmentError(ValueError):
-    """Raised for an attachment this baseline cannot read: an unrecognized
-    type, one that decodes but carries no extractable text (e.g. a scanned
-    PDF), or one email_parser.py can't even decode to bytes (e.g. a
-    forwarded message/rfc822). Unsupported/unreadable attachments fail
-    explicitly rather than being silently skipped — this can also reject an
-    unrelated inline logo, which is an accepted, documented tradeoff (see
-    architecture/DATA_FLOW.md)."""
-
-
-class NoUsableSourceTextError(ValueError):
-    """Raised when parsing succeeds but leaves nothing to extract from: an
-    empty body and no attachments. Sibling of UnsupportedAttachmentError —
-    architecture/LLM_DESIGN.md's failure table maps both to the same 422."""
 
 
 @dataclass
@@ -95,8 +54,7 @@ class EmailAttachment:
 
 @dataclass
 class ParsedEmail:
-    """The deterministic parse of one raw email. No AI; standard-library
-    `email` only."""
+    """Regular parse of one raw email."""
 
     sender: str | None
     subject: str | None
@@ -183,19 +141,50 @@ class NonRfqResult(BaseModel):
     _validate_is_rfq = model_validator(mode="before")(_require_actual_bool_is_rfq)
 
 
-# Not a Field(discriminator=...) union: pydantic renders a discriminated
-# union as JSON Schema `oneOf`, which OpenAI's structured-output mode
-# rejects (confirmed via the live schema smoke test in
-# tests/test_live_samples.py). A plain Union renders as `anyOf`, which is
-# supported; RfqResult and NonRfqResult have disjoint required keys and a
-# strict, non-coercible isRfq, so member selection stays unambiguous.
 PublicResult = Union[RfqResult, NonRfqResult]
+
+TriageCategory = Literal["begin_pricing", "review_sourcing", "clarify_with_customer"]
+
+TRIAGE_CATEGORY_LABELS: dict[str, str] = {
+    "begin_pricing": "Begin pricing",
+    "review_sourcing": "Review sourcing requirements",
+    "clarify_with_customer": "Clarify with customer",
+}
+
+
+class TriageRecommendation(BaseModel):
+    """An advisory next action for the quoting employee, generated
+    alongside extraction. Internal only — never part of the public
+    RfqResult/NonRfqResult contract."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    category: TriageCategory
+    reason: str = Field(min_length=1)
+    nextStep: str = Field(min_length=1)
+
+    @field_validator("reason", "nextStep")
+    @classmethod
+    def _reject_blank(cls, value: str) -> str:
+        if value.strip() == "":
+            raise ValueError("must not be blank")
+        return value
 
 
 class ModelEnvelope(BaseModel):
     """Private provider-only wrapper. Never exposed by /ingest directly;
-    the extractor returns envelope.result."""
+    the extractor returns envelope.result. triage is required for an RFQ
+    and must be null otherwise."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
     result: PublicResult
+    triage: TriageRecommendation | None
+
+    @model_validator(mode="after")
+    def _require_triage_iff_rfq(self) -> "ModelEnvelope":
+        if isinstance(self.result, RfqResult) and self.triage is None:
+            raise ValueError("triage is required when result is an RFQ")
+        if isinstance(self.result, NonRfqResult) and self.triage is not None:
+            raise ValueError("triage must be null when result is not an RFQ")
+        return self

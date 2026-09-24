@@ -11,7 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from app.attachment_parser import UnsupportedAttachmentError, build_source_bundle
+from app.attachment_parser import build_source_bundle
+from app.exceptions import UnsupportedAttachmentError
 from app.email_parser import EmailParseError, parse_email
 from app.models import EmailAttachment, ParsedEmail
 

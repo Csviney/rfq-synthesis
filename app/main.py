@@ -1,7 +1,4 @@
-"""App setup, HTTP routes, and error responses. See
-architecture/ARCHITECTURE.md ("HTTP and dashboard") and
-architecture/LLM_DESIGN.md ("Failures") for the exact status-code mapping.
-"""
+"""App setup, HTTP routes, and error responses."""
 
 import functools
 from contextlib import asynccontextmanager
@@ -15,22 +12,21 @@ from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
 from app.email_parser import EmailParseError
-from app.llm_client import (
-    LlmConfig,
+from app.exceptions import (
     LlmConfigError,
+    NoUsableSourceTextError,
     ProviderResponseError,
     ProviderTimeoutError,
     ProviderUnavailableError,
-    build_client,
-    extract,
+    UnsupportedAttachmentError,
 )
-from app.models import NoUsableSourceTextError, RfqResult, UnsupportedAttachmentError
+from app.llm_client import LlmConfig, build_client, extract
+from app.models import TRIAGE_CATEGORY_LABELS, RfqResult, TriageCategory
 from app.rfq_service import process_email
 from app.store import RfqStore
 
 ACCEPTED_CONTENT_TYPES = {"message/rfc822", "application/octet-stream"}
-# Reject an oversized input outright rather than truncating a parts list;
-# see architecture/DATA_FLOW.md.
+# Reject an oversized input outright rather than truncating a parts list.
 MAX_EMAIL_BYTES = 10 * 1024 * 1024
 
 
@@ -42,14 +38,13 @@ async def lifespan(app: FastAPI):
         client = build_client(config)
         app.state.client = client
         # The route handler only ever calls app.state.extractor — tests
-        # substitute a fake one here, per architecture/IMPLEMENTATION_PLAN.md
-        # ("Substitute a fake extractor only to test application plumbing").
+        # substitute a fake one here instead of hitting the real model.
         app.state.extractor = functools.partial(extract, client, config.model)
     except LlmConfigError as config_error:
-        # Don't crash startup over missing config; fail with 503 instead
-        # (see the 503 case in LLM_DESIGN.md) — but only once input
-        # validation has had a chance to reject a bad request first. This
-        # extractor raises lazily, exactly where the real one would run.
+        # Don't crash startup over missing config; fail with 503 instead,
+        # but only once input validation has had a chance to reject a bad
+        # request first. This extractor raises lazily, exactly where the
+        # real one would run.
         app.state.client = None
 
         def _unconfigured_extractor(bundle, _error=config_error):
@@ -64,28 +59,34 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
-# Jinja renders None as the literal text "None"; this filter is the one
-# place "missing" is turned into a display placeholder, kept distinct from
-# a real falsy value like quantity 0 or an empty string (which this filter
-# leaves untouched — only `None` triggers it).
+# Jinja renders None as the literal text "None" so this explicitly converts
+# missing values to "-"
 templates.env.filters["display"] = lambda value: "—" if value is None else value
 
 
 @app.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request):
+async def dashboard(request: Request, category: TriageCategory | None = None):
     # Newest first, so an operator glancing at the page sees this
     # morning's RFQs at the top without scrolling.
-    rfqs = list(reversed(request.app.state.store.list()))
-    return templates.TemplateResponse(request, "index.html", {"rfqs": rfqs})
+    all_rfqs = list(reversed(request.app.state.store.list()))
+    rfqs = all_rfqs if category is None else [r for r in all_rfqs if r.triage.category == category]
+    return templates.TemplateResponse(
+        request,
+        "index.html",
+        {
+            "rfqs": rfqs,
+            "total_count": len(all_rfqs),
+            "selected_category": category,
+            "categories": TRIAGE_CATEGORY_LABELS,
+        },
+    )
 
 
 def _get_subject(raw: bytes) -> str | None:
     # process_email has already proven `raw` parses; this is a second,
     # header-only read for the store's display metadata, kept separate so
     # process_email's return type stays exactly the public
-    # RfqResult/NonRfqResult contract. BytesHeaderParser stops at the first
-    # blank line and never walks the MIME tree — email.message_from_bytes
-    # would rebuild the whole multipart structure just to read one header.
+    # RfqResult/NonRfqResult contract.
     return BytesHeaderParser(policy=policy.default).parsebytes(raw).get("Subject")
 
 
@@ -116,7 +117,7 @@ async def ingest(request: Request):
     raw = b"".join(body_parts)
 
     try:
-        result = await run_in_threadpool(process_email, raw, request.app.state.extractor)
+        envelope = await run_in_threadpool(process_email, raw, request.app.state.extractor)
     except EmailParseError as exc:
         raise HTTPException(status_code=400, detail="Could not read the email") from exc
     except LlmConfigError as exc:
@@ -132,8 +133,8 @@ async def ingest(request: Request):
     except ProviderResponseError as exc:
         raise HTTPException(status_code=502, detail="Provider returned an invalid result") from exc
 
-    if isinstance(result, RfqResult):
+    if isinstance(envelope.result, RfqResult):
         subject = await run_in_threadpool(_get_subject, raw)
-        request.app.state.store.add(result, subject=subject)
+        request.app.state.store.add(envelope.result, envelope.triage, subject=subject)
 
-    return result
+    return envelope.result

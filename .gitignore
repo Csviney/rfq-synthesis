@@ -15,6 +15,10 @@ __pycache__/
 .coverage.*
 htmlcov/
 coverage.xml
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
 
 # Generated Python packaging files.
 *.egg-info/
@@ -23,3 +27,23 @@ dist/
 
 # macOS metadata.
 .DS_Store
+
+# Local editor and agent settings.
+.idea/
+.vscode/
+.codex/
+.claude/
+
+# Temporary files, logs, and local data exports.
+/tmp/
+/temp/
+*.tmp
+*.temp
+*.log
+*.swp
+*.swo
+*~
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal

@@ -1,14 +1,13 @@
 """POST /ingest: HTTP wiring, failure-to-status-code mapping, and storage.
 No network access — a fake extractor (app.state.extractor) stands in for
-the real model, per architecture/IMPLEMENTATION_PLAN.md's testing policy.
-GET / (the dashboard) is a later step.
+the real model.
 """
 
 import pytest
 from fastapi.testclient import TestClient
 
 import app.main as main_module
-from app.llm_client import (
+from app.exceptions import (
     LlmConfigError,
     ProviderResponseError,
     ProviderTimeoutError,
@@ -37,8 +36,16 @@ VALID_RFQ = {
 
 VALID_NON_RFQ = {"isRfq": False, "confidence": 0.95, "reason": "Newsletter, not an RFQ."}
 
-RFQ_RESULT = ModelEnvelope.model_validate({"result": VALID_RFQ}).result
-NON_RFQ_RESULT = ModelEnvelope.model_validate({"result": VALID_NON_RFQ}).result
+VALID_TRIAGE = {
+    "category": "begin_pricing",
+    "reason": "All parts are identified with an explicit quantity.",
+    "nextStep": "Check unit pricing and lead times.",
+}
+
+RFQ_ENVELOPE = ModelEnvelope.model_validate({"result": VALID_RFQ, "triage": VALID_TRIAGE})
+NON_RFQ_ENVELOPE = ModelEnvelope.model_validate({"result": VALID_NON_RFQ, "triage": None})
+RFQ_RESULT = RFQ_ENVELOPE.result
+NON_RFQ_RESULT = NON_RFQ_ENVELOPE.result
 
 
 def _raw_email(body: str = "Please quote 500 of LM358N.") -> bytes:
@@ -66,7 +73,7 @@ def _post(client, raw: bytes, content_type: str = "message/rfc822", **kwargs):
 
 
 def test_rfq_response_matches_contract_exactly_and_is_stored(client):
-    client.app.state.extractor = lambda bundle: RFQ_RESULT
+    client.app.state.extractor = lambda bundle: RFQ_ENVELOPE
 
     response = _post(client, _raw_email())
 
@@ -95,10 +102,11 @@ def test_rfq_response_matches_contract_exactly_and_is_stored(client):
     assert len(stored) == 1
     assert stored[0].subject == "RFQ - test"
     assert stored[0].result == RFQ_RESULT
+    assert stored[0].triage == RFQ_ENVELOPE.triage
 
 
 def test_non_rfq_response_matches_contract_and_is_not_stored(client):
-    client.app.state.extractor = lambda bundle: NON_RFQ_RESULT
+    client.app.state.extractor = lambda bundle: NON_RFQ_ENVELOPE
 
     response = _post(client, _raw_email())
 
@@ -112,7 +120,7 @@ def test_non_rfq_response_matches_contract_and_is_not_stored(client):
 
 
 def test_reingesting_the_same_email_adds_another_record(client):
-    client.app.state.extractor = lambda bundle: RFQ_RESULT
+    client.app.state.extractor = lambda bundle: RFQ_ENVELOPE
     _post(client, _raw_email())
     _post(client, _raw_email())
     assert len(client.app.state.store.list()) == 2
@@ -206,7 +214,7 @@ def test_provider_errors_map_to_documented_status_codes(client, exc, status):
 
 
 def test_unsupported_attachment_maps_to_422(client):
-    client.app.state.extractor = lambda bundle: RFQ_RESULT
+    client.app.state.extractor = lambda bundle: RFQ_ENVELOPE
 
     msg = (
         b"From: a@example.com\r\n"

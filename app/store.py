@@ -1,35 +1,35 @@
 """In-memory RFQ collection. Restart clears results; re-ingestion adds
-another entry — see architecture/ARCHITECTURE.md ("Stored RFQ") and
-architecture/DECISIONS.md ("In-memory store"). Only a successful RfqResult
+another entry. Only a successful RfqResult
 is ever stored; a NonRfqResult or a failed ingestion never reaches here.
 """
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from app.models import RfqResult
+from app.models import RfqResult, TriageRecommendation
 
 
 @dataclass
 class StoredRfq:
-    """The validated public result plus subject and ingestion time for
-    display. This metadata never enters the public /ingest response."""
+    """The validated public result plus triage, subject, and ingestion
+    time for display. None of this enters the public /ingest response."""
 
     result: RfqResult
+    triage: TriageRecommendation
     subject: str | None
     ingested_at: datetime
 
 
 class RfqStore:
-    """One process-wide, in-memory list. `list.append`/iteration are
-    atomic under the GIL, so this needs no extra locking for the single
-    worker-thread-per-request model described in ARCHITECTURE.md."""
+    """One process-wide, in-memory list."""
 
     def __init__(self) -> None:
         self._items: list[StoredRfq] = []
 
-    def add(self, result: RfqResult, subject: str | None) -> StoredRfq:
-        stored = StoredRfq(result=result, subject=subject, ingested_at=datetime.now(timezone.utc))
+    def add(self, result: RfqResult, triage: TriageRecommendation, subject: str | None) -> StoredRfq:
+        stored = StoredRfq(
+            result=result, triage=triage, subject=subject, ingested_at=datetime.now(timezone.utc)
+        )
         self._items.append(stored)
         return stored
 

@@ -1,13 +1,9 @@
-"""Local validation of the public contract and provider envelope from
-architecture/LLM_DESIGN.md. No network access; this is the "both response
-shapes validate locally" half of Implementation Plan step 1's completion
-check.
-"""
+"""Local validation of the public contract and provider envelope."""
 
 import pytest
 from pydantic import ValidationError
 
-from app.models import LineItem, ModelEnvelope, NonRfqResult, RfqResult
+from app.models import LineItem, ModelEnvelope, NonRfqResult, RfqResult, TriageRecommendation
 
 VALID_RFQ = {
     "isRfq": True,
@@ -42,6 +38,12 @@ VALID_NON_RFQ = {
     "reason": "Order confirmation, not a request for quotation.",
 }
 
+VALID_TRIAGE = {
+    "category": "begin_pricing",
+    "reason": "All parts are identified with an explicit quantity.",
+    "nextStep": "Check unit pricing and lead times.",
+}
+
 
 def test_valid_rfq_validates():
     result = RfqResult.model_validate(VALID_RFQ)
@@ -56,17 +58,18 @@ def test_valid_non_rfq_validates():
 
 
 def test_envelope_discriminates_rfq_and_non_rfq():
-    rfq_envelope = ModelEnvelope.model_validate({"result": VALID_RFQ})
+    rfq_envelope = ModelEnvelope.model_validate({"result": VALID_RFQ, "triage": VALID_TRIAGE})
     assert isinstance(rfq_envelope.result, RfqResult)
 
-    non_rfq_envelope = ModelEnvelope.model_validate({"result": VALID_NON_RFQ})
+    non_rfq_envelope = ModelEnvelope.model_validate({"result": VALID_NON_RFQ, "triage": None})
     assert isinstance(non_rfq_envelope.result, NonRfqResult)
 
 
 def test_ingest_response_excludes_provider_wrapper():
-    envelope = ModelEnvelope.model_validate({"result": VALID_RFQ})
+    envelope = ModelEnvelope.model_validate({"result": VALID_RFQ, "triage": VALID_TRIAGE})
     dumped = envelope.result.model_dump(mode="json")
     assert "result" not in dumped
+    assert "triage" not in dumped
     assert dumped["isRfq"] is True
 
 
@@ -265,4 +268,51 @@ def test_is_rfq_does_not_coerce_from_int():
 
 def test_envelope_rejects_result_missing_discriminator_match():
     with pytest.raises(ValidationError):
-        ModelEnvelope.model_validate({"result": {"isRfq": True}})
+        ModelEnvelope.model_validate({"result": {"isRfq": True}, "triage": None})
+
+
+def test_valid_triage_validates():
+    triage = TriageRecommendation.model_validate(VALID_TRIAGE)
+    assert triage.category == "begin_pricing"
+
+
+@pytest.mark.parametrize("category", ["begin_pricing", "review_sourcing", "clarify_with_customer"])
+def test_all_three_triage_categories_validate(category):
+    TriageRecommendation.model_validate({**VALID_TRIAGE, "category": category})
+
+
+def test_invalid_triage_category_is_rejected():
+    with pytest.raises(ValidationError):
+        TriageRecommendation.model_validate({**VALID_TRIAGE, "category": "expedite"})
+
+
+@pytest.mark.parametrize("field", ["reason", "nextStep"])
+@pytest.mark.parametrize("blank_value", ["", "   "])
+def test_blank_triage_text_is_rejected(field, blank_value):
+    with pytest.raises(ValidationError):
+        TriageRecommendation.model_validate({**VALID_TRIAGE, field: blank_value})
+
+
+def test_envelope_requires_triage_when_result_is_an_rfq():
+    with pytest.raises(ValidationError):
+        ModelEnvelope.model_validate({"result": VALID_RFQ, "triage": None})
+
+
+def test_envelope_requires_missing_triage_key_is_rejected_for_rfq():
+    with pytest.raises(ValidationError):
+        ModelEnvelope.model_validate({"result": VALID_RFQ})
+
+
+def test_envelope_requires_triage_to_be_null_when_result_is_not_an_rfq():
+    with pytest.raises(ValidationError):
+        ModelEnvelope.model_validate({"result": VALID_NON_RFQ, "triage": VALID_TRIAGE})
+
+
+def test_envelope_accepts_null_triage_for_non_rfq():
+    envelope = ModelEnvelope.model_validate({"result": VALID_NON_RFQ, "triage": None})
+    assert envelope.triage is None
+
+
+def test_triage_rejects_extra_fields():
+    with pytest.raises(ValidationError):
+        TriageRecommendation.model_validate({**VALID_TRIAGE, "confidence": 0.9})

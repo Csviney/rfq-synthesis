@@ -1,8 +1,7 @@
 # Future fixes
 
 Changes I'd like to make with more time, outside the current scope and time
-budget. Not part of the agreed architecture in `architecture/`; nothing
-here should be implemented without separately deciding to expand scope.
+budget.
 
 ## Compare model quality and cost before scaling
 
@@ -58,6 +57,46 @@ reviewing only accepted RFQs cannot discover actual RFQs mislabeled as non-RFQs.
 
 This is a future workflow; the MVP retains its current storage, public response
 contract, and confidence-independent routing.
+
+## Ground triage in structured decision evidence
+
+Have the existing model call identify which items have quantity ranges or
+approximations and which stated requirements need internal sourcing review,
+with supporting source text. Keep these signals in the private model envelope
+and apply general workflow rules to select the category and next action.
+
+Live reviews found inconsistent sourcing recommendations for multi-project
+requests and quantity-break advice applied to fixed quantities; a subsequent
+agent evaluation reported the reverse error on a genuine range. Explicit
+signals would separate source requirements from normalized quantities and make
+decisions easier to inspect and test. Preserve the public `/ingest` contract
+and single model call. Validate on unseen and repeated cases: deterministic
+routing cannot compensate for incorrectly extracted signals.
+
+## Prioritize RFQs by expected profit and quoting effort
+
+Extend triage beyond date checks, customer urgency, and next-action guidance
+to support the underlying business objective: focus quoting effort on RFQs
+most likely to generate profit. The current action categories help decide
+what to do; a future commercial ranking should also help decide which
+opportunity deserves attention first.
+
+Connect purchasing costs, achievable selling prices, inventory and supplier
+availability, fulfillment costs, customer history, and quote outcomes. Use
+those records to estimate contribution profit and likelihood of winning,
+then consider the effort required to prepare the quote. Large quantities or
+high customer target prices alone are not evidence of profitability.
+
+Calculate financial measures from business records; use the LLM to interpret
+requirements and explain how the evidence affects the recommendation. Show
+missing data and uncertainty, allow human overrides, and retain urgency and
+customer commitments alongside commercial value. Do not invent profit or
+win-probability estimates from email text alone.
+
+Evaluate this direction against realized contribution profit, quote conversion,
+response time, and quoting effort—not just agreement with a priority label.
+This is a future integration and evaluation effort, not a change to the
+current triage implementation.
 
 ## Warning dedup is exact-string-match only
 

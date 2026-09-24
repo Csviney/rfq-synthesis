@@ -7,12 +7,15 @@
   body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 900px; padding: 0 1rem; color: #1a1a1a; }
   h1 { font-size: 1.4rem; }
   .subtitle { color: #555; margin-top: -0.5rem; }
+  .filters { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0 1.5rem; }
+  .filters a { text-decoration: none; padding: 0.3rem 0.75rem; border-radius: 999px; border: 1px solid #ccc; color: #333; font-size: 0.85rem; }
+  .filters a.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
   .empty-state { border: 1px dashed #bbb; border-radius: 8px; padding: 2rem; text-align: center; color: #555; margin-top: 2rem; }
   .rfq { border: 1px solid #ddd; border-radius: 8px; margin-bottom: 1rem; padding: 0; }
   .rfq summary { cursor: pointer; padding: 0.85rem 1rem; list-style: none; }
   .rfq summary::-webkit-details-marker { display: none; }
   .rfq summary .subject { font-weight: 600; }
-  .rfq summary .meta { color: #555; font-size: 0.9rem; margin-top: 0.15rem; }
+  .rfq summary .meta { color: #555; font-size: 0.9rem; margin-top: 0.15rem; display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
   .rfq-body { padding: 0 1rem 1rem 1rem; border-top: 1px solid #eee; }
   .section { margin-top: 1rem; }
   .section h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; color: #666; margin-bottom: 0.4rem; }
@@ -26,14 +29,33 @@
   .no-warnings { color: #555; }
   .confidence { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; background: #eef2ff; color: #2f3fa8; font-size: 0.85rem; }
   .priority-high, .priority-urgent { color: #a83232; font-weight: 600; }
+  .triage-badge { display: inline-block; padding: 0.1rem 0.6rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600; }
+  .triage-begin_pricing { background: #e6f4ea; color: #1e6b3c; }
+  .triage-review_sourcing { background: #fff4e0; color: #8a5300; }
+  .triage-clarify_with_customer { background: #fde8e8; color: #a83232; }
+  .triage-advisory-note { color: #777; font-size: 0.8rem; font-style: italic; margin-top: 0.3rem; }
+  .priority-note { color: #777; font-size: 0.8rem; font-weight: normal; }
 </style>
 </head>
 <body>
   <h1>RFQ Dashboard</h1>
-  <p class="subtitle">{{ rfqs | length }} RFQ{{ "" if rfqs | length == 1 else "s" }} ingested this session</p>
+  {% if selected_category %}
+    <p class="subtitle">{{ rfqs | length }} of {{ total_count }} RFQ{{ "" if total_count == 1 else "s" }} — filtered by {{ categories[selected_category] }}</p>
+  {% else %}
+    <p class="subtitle">{{ total_count }} RFQ{{ "" if total_count == 1 else "s" }} ingested this session</p>
+  {% endif %}
 
-  {% if not rfqs %}
+  <nav class="filters">
+    <a href="/" class="{{ "active" if not selected_category else "" }}">All RFQs</a>
+    {% for value, label in categories.items() %}
+      <a href="/?category={{ value }}" class="{{ "active" if selected_category == value else "" }}">{{ label }}</a>
+    {% endfor %}
+  </nav>
+
+  {% if not total_count %}
     <div class="empty-state">No RFQs ingested yet. POST an email to /ingest, then refresh this page.</div>
+  {% elif not rfqs %}
+    <div class="empty-state">No RFQs match this filter.</div>
   {% endif %}
 
   {% for rfq in rfqs %}
@@ -47,9 +69,21 @@
           {{ rfq.ingested_at.strftime("%Y-%m-%d %H:%M UTC") }} &middot;
           {{ result.lineItems | length }} item{{ "" if result.lineItems | length == 1 else "s" }} &middot;
           <span class="confidence">{{ (result.confidence * 100) | round | int }}% confidence</span>
+          <span class="triage-badge triage-{{ rfq.triage.category }}">{{ categories[rfq.triage.category] }}</span>
         </div>
       </summary>
       <div class="rfq-body">
+        <div class="section">
+          <h3>Recommended action</h3>
+          <dl class="fields">
+            <dt>Action</dt>
+            <dd><span class="triage-badge triage-{{ rfq.triage.category }}">{{ categories[rfq.triage.category] }}</span></dd>
+            <dt>Reason</dt><dd>{{ rfq.triage.reason }}</dd>
+            <dt>Next step</dt><dd>{{ rfq.triage.nextStep }}</dd>
+          </dl>
+          <p class="triage-advisory-note">Advisory recommendation — not an automated decision. Review before acting.</p>
+        </div>
+
         <div class="section">
           <h3>Customer</h3>
           <dl class="fields">
@@ -64,8 +98,8 @@
           <h3>Request</h3>
           <dl class="fields">
             <dt>Due date</dt><dd>{{ result.request.dueDate | display }}</dd>
-            <dt>Priority</dt>
-            <dd class="priority-{{ result.request.priority }}">{{ result.request.priority }}</dd>
+            <dt>Customer priority</dt>
+            <dd class="priority-{{ result.request.priority }}">{{ result.request.priority }} <span class="priority-note">(medium is the default when urgency isn't stated)</span></dd>
             <dt>Special instructions</dt><dd>{{ result.request.specialInstructions | display }}</dd>
           </dl>
         </div>
